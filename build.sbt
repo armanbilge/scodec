@@ -41,12 +41,12 @@ ThisBuild / mimaBinaryIssueFilters ++= Seq(
 
 lazy val root = tlCrossRootProject.aggregate(testkit, core, unitTests, benchmarks)
 
-lazy val core = crossProject(JVMPlatform, JSPlatform)
+lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("."))
   .settings(
     name := "scodec-core",
     libraryDependencies ++= Seq(
-      "org.scodec" %%% "scodec-bits" % "1.1.31"
+      "org.scodec" %%% "scodec-bits" % "1.1.32"
     ),
     scalacOptions := scalacOptions.value
       .filterNot(_ == "-source:3.0-migration") :+ "-source:future",
@@ -56,36 +56,39 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       (base / "NOTICE") +: (base / "LICENSE") +: ((base / "licenses") * "LICENSE_*").get
     }
   )
-
-lazy val coreJS = core.js.settings(
-  scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)),
-  mimaBinaryIssueFilters ++= Seq(
-    ProblemFilters.exclude[MissingClassProblem]("scodec.codecs.ZlibCodec")
+  .jsSettings(
+    mimaBinaryIssueFilters ++= Seq(
+      ProblemFilters.exclude[MissingClassProblem]("scodec.codecs.ZlibCodec")
+    )
   )
-)
+  .nativeSettings(
+    tlVersionIntroduced := Map("3" -> "2.1.1")
+  )
 
-lazy val testkit = crossProject(JVMPlatform, JSPlatform)
+lazy val testkit = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .settings(
     name := "scodec-testkit",
-    libraryDependencies += "org.scalameta" %%% "munit-scalacheck" % "0.7.29",
+    libraryDependencies += "org.scalameta" %%% "munit-scalacheck" % "1.0.0-M4",
     scalacOptions := scalacOptions.value.filterNot(_ == "-source:3.0-migration") :+ "-source:future"
   )
-  .dependsOn(core % "compile->compile")
+  .nativeSettings(
+    tlVersionIntroduced := Map("3" -> "2.1.1")
+  )
+  .dependsOn(core)
 
-lazy val testkitJVM = testkit.jvm
-lazy val testkitJS = testkit.js
-
-lazy val unitTests = project
+lazy val unitTests = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .settings(
-    libraryDependencies ++= Seq(
-      "org.bouncycastle" % "bcpkix-jdk15on" % "1.70" % "test"
-    ),
     scalacOptions := scalacOptions.value.filterNot(
       _ == "-source:3.0-migration"
     ) :+ "-source:future",
     Test / scalacOptions := (Compile / scalacOptions).value
   )
-  .dependsOn(testkitJVM % "test->compile")
+  .jvmSettings(
+    libraryDependencies ++= Seq(
+      "org.bouncycastle" % "bcpkix-jdk15on" % "1.70" % Test
+    )
+  )
+  .dependsOn(testkit)
   .enablePlugins(NoPublishPlugin)
 
 lazy val benchmarks = project
